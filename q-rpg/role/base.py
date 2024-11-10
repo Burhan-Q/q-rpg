@@ -1,5 +1,11 @@
 """Core components for characters."""
 
+import threading
+
+from overseer import total_check, balance_check, exp_to_level_up
+from status import Status, StatusEffect, Buff, Debuff
+
+
 class CharacterAttributes:
     def __init__(
             self,
@@ -144,3 +150,85 @@ class CharacterAttributes:
         +++ Intelligence:{self.intelligence}
         """
 
+
+class Character(CharacterAttributes):
+    def __init__(
+            self,
+            attributes: CharacterAttributes
+        ) -> None:
+        super().__init__(**attributes.asdict())
+        self._exp = 0
+        self._level = 1
+        self._exp_to_next_level = exp_to_level_up(self._level)
+        self.status = Status.HEALTHY
+    
+    @property
+    def exp(self) -> int:
+        return self._exp
+    
+    @exp.setter
+    def exp(self, value: int) -> None:
+        self._exp = value
+        if self._exp >= self._exp_to_next_level:
+            self.level_up()
+
+    @property
+    def level(self) -> int:
+        return self._level
+    
+    @level.setter
+    def level(self, value: int) -> None:
+        self._level = value
+    
+    def attribute_check(self, attribute: str, value: int) -> bool:
+        return getattr(self, attribute) >= value
+
+    def attack(self, target: "Character") -> None:
+        if self.status != Status.DEAD:
+            target.defend(self.strength)
+
+    def defend(self, damage: int) -> None:
+        damage -= self.defense
+        if damage > 0:
+            self.health -= damage
+        if self.health <= 0:
+            self.status = Status.DEAD
+
+    # def use_item(self, item: Item) -> None:
+    #     setattr(
+    #         self,
+    #         item.effect.lower(),
+    #         getattr(self, item.effect.lower()) + item.value
+    #     )
+
+    def level_up(self) -> None:
+        for attribute in {"max_strength", "max_agility", "max_intelligence", "max_defense"}:
+            setattr(self, attribute, getattr(self, attribute) + 1)
+        self.exp = 0
+        self._level += 1
+        self.max_health += 10
+        self._exp_to_next_level = exp_to_level_up(self._level)
+    
+    def apply_buff(self, buff:Buff) -> None:
+        buff.apply(self)
+    
+    def apply_debuff(self, debuff:Debuff) -> None:
+        debuff.apply(self)
+
+    def effect(self, effect:StatusEffect) -> None:
+        self._e = effect  # TODO make this a property
+        threading.Thread(target=effect.apply, kwargs={"target": self}, daemon=True).start()
+        if self._e.expired and self.status != Status.DEAD:
+            self.status = Status.HEALTHY
+    
+    def __repr__(self) -> str:
+        return f"{self.name} +++ Class:{self.job_class} +++ Level:{self.level} +++ XP:{self.exp} +++ Status:{self.status.value}"
+    
+    def __str__(self) -> str:
+        return f"{self.name} the {self.job_class} is {self.status.value}."
+
+    def __add__(self, val) -> None:
+        self.exp += val
+    
+    def __sub__(self, val) -> None:
+        self.health -= val
