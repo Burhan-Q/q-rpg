@@ -13,7 +13,7 @@ class Status(Enum):
     DEBUFFED = "Debuffed"
 
 
-class StatusEffects(Enum):
+class StatusArgs(Enum):
     POISONED = ("Poisoned", "health", 15, 3)
     BURNED = ("Burned", "health", 9, 6)
     FROZEN = ("Frozen", "agility", 8, 10)
